@@ -158,6 +158,102 @@ router.post('/', (req, res) => {
   res.status(201).json(invoice);
 });
 
+// PUT update invoice (full edit for draft invoices)
+router.put('/:id', (req, res) => {
+  const db = getDb();
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  if (invoice.status !== 'draft') {
+    return res.status(400).json({ error: 'Only draft invoices can be edited' });
+  }
+
+  const { customer_id, invoice_date, due_date, items, notes } = req.body;
+  if (!customer_id || !invoice_date || !items || items.length === 0) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(invoice.business_id);
+  const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customer_id);
+  if (!customer) return res.status(400).json({ error: 'Customer not found' });
+
+  const isIgst = business.state_code !== customer.state_code;
+
+  let subtotal = 0;
+  let cgstTotal = 0;
+  let sgstTotal = 0;
+  let igstTotal = 0;
+
+  const processedItems = items.map(item => {
+    const amount = round2(item.quantity * item.rate);
+    const taxAmount = round2(amount * item.gst_rate / 100);
+    let cgst = 0, sgst = 0, igst = 0;
+
+    if (isIgst) {
+      igst = taxAmount;
+    } else {
+      cgst = round2(taxAmount / 2);
+      sgst = round2(taxAmount / 2);
+    }
+
+    subtotal += amount;
+    cgstTotal += cgst;
+    sgstTotal += sgst;
+    igstTotal += igst;
+
+    return {
+      ...item,
+      amount,
+      cgst_amount: cgst,
+      sgst_amount: sgst,
+      igst_amount: igst,
+      total: round2(amount + taxAmount),
+    };
+  });
+
+  subtotal = round2(subtotal);
+  cgstTotal = round2(cgstTotal);
+  sgstTotal = round2(sgstTotal);
+  igstTotal = round2(igstTotal);
+  const totalTax = round2(cgstTotal + sgstTotal + igstTotal);
+  const grandTotal = round2(subtotal + totalTax);
+  const amountInWords = numberToWords(grandTotal);
+
+  const updateInvoice = db.transaction(() => {
+    db.prepare(`
+      UPDATE invoices SET customer_id = ?, invoice_date = ?, due_date = ?, place_of_supply = ?,
+        supply_state_code = ?, is_igst = ?, subtotal = ?, cgst_total = ?, sgst_total = ?,
+        igst_total = ?, total_tax = ?, grand_total = ?, amount_in_words = ?, notes = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      customer_id, invoice_date, due_date || null, customer.state, customer.state_code,
+      isIgst ? 1 : 0, subtotal, cgstTotal, sgstTotal, igstTotal, totalTax, grandTotal,
+      amountInWords, notes || null, req.params.id
+    );
+
+    db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(req.params.id);
+
+    const insertItem = db.prepare(`
+      INSERT INTO invoice_items (invoice_id, product_id, description, hsn_code, unit, quantity, rate, amount, gst_rate, cgst_amount, sgst_amount, igst_amount, total)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const item of processedItems) {
+      insertItem.run(
+        req.params.id, item.product_id || null, item.description, item.hsn_code,
+        item.unit || 'NOS', item.quantity, item.rate, item.amount,
+        item.gst_rate, item.cgst_amount, item.sgst_amount, item.igst_amount, item.total
+      );
+    }
+  });
+
+  updateInvoice();
+
+  const updated = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  updated.items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ?').all(req.params.id);
+  res.json(updated);
+});
+
 // PUT update invoice status
 router.put('/:id/status', (req, res) => {
   const db = getDb();

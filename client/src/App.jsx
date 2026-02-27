@@ -8,10 +8,16 @@ import CustomerForm from './pages/CustomerForm';
 import ProductList from './pages/ProductList';
 import ProductForm from './pages/ProductForm';
 import BusinessSettings from './pages/BusinessSettings';
+import Reports from './pages/Reports';
+import CreditNoteList from './pages/CreditNoteList';
+import CreditNoteCreate from './pages/CreditNoteCreate';
+import CreditNoteDetail from './pages/CreditNoteDetail';
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/invoices', label: 'Invoices' },
+  { to: '/credit-notes', label: 'Credit Notes' },
+  { to: '/reports', label: 'Reports' },
   { to: '/customers', label: 'Customers' },
   { to: '/products', label: 'Products' },
   { to: '/settings', label: 'Settings' },
@@ -64,6 +70,11 @@ export default function App() {
           <Route path="/invoices" element={<InvoiceList />} />
           <Route path="/invoices/new" element={<InvoiceCreate />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
+          <Route path="/invoices/:id/edit" element={<InvoiceCreate />} />
+          <Route path="/credit-notes" element={<CreditNoteList />} />
+          <Route path="/credit-notes/new" element={<CreditNoteCreate />} />
+          <Route path="/credit-notes/:id" element={<CreditNoteDetail />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/customers" element={<CustomerList />} />
           <Route path="/customers/new" element={<CustomerForm />} />
           <Route path="/customers/:id/edit" element={<CustomerForm />} />

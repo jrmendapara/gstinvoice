@@ -46,6 +46,21 @@ export const api = {
   getInvoice: (id) => request(`/invoices/${id}`),
   getNextInvoiceNumber: () => request('/invoices/next/number'),
   createInvoice: (data) => request('/invoices', { method: 'POST', body: JSON.stringify(data) }),
+  updateInvoice: (id, data) => request(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   updateInvoiceStatus: (id, status) => request(`/invoices/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   deleteInvoice: (id) => request(`/invoices/${id}`, { method: 'DELETE' }),
+
+  // Reports
+  getGstr1: (from, to) => request(`/reports/gstr1?from=${from}&to=${to}`),
+  getGstr3b: (from, to) => request(`/reports/gstr3b?from=${from}&to=${to}`),
+
+  // Credit Notes
+  getCreditNotes: (params) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/credit-notes${query ? `?${query}` : ''}`);
+  },
+  getCreditNote: (id) => request(`/credit-notes/${id}`),
+  createCreditNote: (data) => request('/credit-notes', { method: 'POST', body: JSON.stringify(data) }),
+  updateCreditNoteStatus: (id, status) => request(`/credit-notes/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  deleteCreditNote: (id) => request(`/credit-notes/${id}`, { method: 'DELETE' }),
 };

@@ -1,59 +1,51 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../api';
 import { GST_RATES, UNITS, formatCurrency } from '../constants';
 
 const emptyItem = { description: '', hsn_code: '', unit: 'NOS', quantity: 1, rate: 0, gst_rate: 18, product_id: null };
 
-export default function InvoiceCreate() {
+const REASONS = [
+  'Sales Return',
+  'Post Sale Discount',
+  'Deficiency in Service',
+  'Correction in Invoice',
+  'Change in POS',
+  'Finalization of Provisional Assessment',
+  'Other',
+];
+
+export default function CreditNoteCreate() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const isEdit = Boolean(id);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     customer_id: '',
-    invoice_date: new Date().toISOString().split('T')[0],
-    due_date: '',
+    invoice_id: '',
+    credit_note_date: new Date().toISOString().split('T')[0],
+    reason: 'Sales Return',
     notes: '',
     items: [{ ...emptyItem }],
   });
 
   useEffect(() => {
-    const promises = [
+    Promise.all([
       api.getCustomers(),
       api.getProducts(),
       api.getDefaultBusiness(),
-    ];
-    if (isEdit) promises.push(api.getInvoice(id));
-
-    Promise.all(promises)
-      .then(([c, p, b, invoice]) => {
+      api.getInvoices({ status: 'paid' }),
+    ])
+      .then(([c, p, b, inv]) => {
         setCustomers(c);
         setProducts(p);
         setBusiness(b);
-        if (invoice) {
-          setForm({
-            customer_id: String(invoice.customer_id),
-            invoice_date: invoice.invoice_date,
-            due_date: invoice.due_date || '',
-            notes: invoice.notes || '',
-            items: invoice.items.map((item) => ({
-              product_id: item.product_id,
-              description: item.description,
-              hsn_code: item.hsn_code,
-              unit: item.unit,
-              quantity: item.quantity,
-              rate: item.rate,
-              gst_rate: item.gst_rate,
-            })),
-          });
-        }
+        setInvoices(inv);
       })
       .catch(() => toast.error('Failed to load data'))
       .finally(() => setLoading(false));
@@ -95,6 +87,13 @@ export default function InvoiceCreate() {
     }
   }
 
+  function selectInvoice(invoiceId) {
+    const inv = invoices.find((i) => i.id === Number(invoiceId));
+    if (inv) {
+      setForm((f) => ({ ...f, invoice_id: invoiceId, customer_id: String(inv.customer_id) }));
+    }
+  }
+
   function calculateTotals() {
     const selectedCustomer = customers.find((c) => c.id === Number(form.customer_id));
     const isIgst = business && selectedCustomer && business.state_code !== selectedCustomer.state_code;
@@ -119,17 +118,19 @@ export default function InvoiceCreate() {
     return { subtotal, cgst, sgst, igst, total: subtotal + cgst + sgst + igst, isIgst };
   }
 
-  async function handleSubmit(e, status = 'draft') {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!form.customer_id) { toast.error('Please select a customer'); return; }
     if (!form.items.some((i) => i.description && i.rate > 0)) { toast.error('Add at least one valid item'); return; }
 
     setSubmitting(true);
     try {
-      const payload = {
+      const cn = await api.createCreditNote({
+        business_id: business.id,
         customer_id: Number(form.customer_id),
-        invoice_date: form.invoice_date,
-        due_date: form.due_date || null,
+        credit_note_date: form.credit_note_date,
+        invoice_id: form.invoice_id ? Number(form.invoice_id) : null,
+        reason: form.reason,
         notes: form.notes,
         items: form.items.filter((i) => i.description && i.rate > 0).map((i) => ({
           product_id: i.product_id,
@@ -140,19 +141,9 @@ export default function InvoiceCreate() {
           rate: Number(i.rate),
           gst_rate: Number(i.gst_rate),
         })),
-      };
-
-      let invoice;
-      if (isEdit) {
-        invoice = await api.updateInvoice(id, payload);
-        toast.success('Invoice updated successfully');
-      } else {
-        payload.business_id = business.id;
-        payload.status = status;
-        invoice = await api.createInvoice(payload);
-        toast.success('Invoice created successfully');
-      }
-      navigate(`/invoices/${invoice.id}`);
+      });
+      toast.success('Credit note created successfully');
+      navigate(`/credit-notes/${cn.id}`);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -166,13 +157,26 @@ export default function InvoiceCreate() {
 
   return (
     <div>
-      <Link to={isEdit ? `/invoices/${id}` : '/invoices'} className="text-sm text-gray-500 hover:text-gray-700 mb-2 block">&larr; {isEdit ? 'Back to Invoice' : 'Back to Invoices'}</Link>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{isEdit ? 'Edit Invoice' : 'Create New Invoice'}</h1>
+      <Link to="/credit-notes" className="text-sm text-gray-500 hover:text-gray-700 mb-2 block">&larr; Back to Credit Notes</Link>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Credit Note</h1>
 
-      <form onSubmit={(e) => handleSubmit(e)}>
+      <form onSubmit={handleSubmit}>
         <div className="card mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Details</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Credit Note Details</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="label">Original Invoice (optional)</label>
+              <select
+                className="input-field"
+                value={form.invoice_id}
+                onChange={(e) => selectInvoice(e.target.value)}
+              >
+                <option value="">-- Select Invoice --</option>
+                {invoices.map((inv) => (
+                  <option key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="label">Customer *</label>
               <select
@@ -186,26 +190,31 @@ export default function InvoiceCreate() {
                   <option key={c.id} value={c.id}>{c.name} {c.gstin ? `(${c.gstin})` : ''}</option>
                 ))}
               </select>
-              <Link to="/customers/new" className="text-xs text-blue-600 hover:underline mt-1 inline-block">+ Add New Customer</Link>
             </div>
             <div>
-              <label className="label">Invoice Date *</label>
+              <label className="label">Date *</label>
               <input
                 type="date"
                 className="input-field"
-                value={form.invoice_date}
-                onChange={(e) => setForm((f) => ({ ...f, invoice_date: e.target.value }))}
+                value={form.credit_note_date}
+                onChange={(e) => setForm((f) => ({ ...f, credit_note_date: e.target.value }))}
                 required
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
-              <label className="label">Due Date</label>
-              <input
-                type="date"
+              <label className="label">Reason *</label>
+              <select
                 className="input-field"
-                value={form.due_date}
-                onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
-              />
+                value={form.reason}
+                onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                required
+              >
+                {REASONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -360,27 +369,17 @@ export default function InvoiceCreate() {
               )}
               <div className="flex justify-between pt-2 border-t text-lg font-bold">
                 <span>Grand Total</span>
-                <span className="text-blue-600">{formatCurrency(totals.total)}</span>
+                <span className="text-red-600">{formatCurrency(totals.total)}</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={() => navigate(isEdit ? `/invoices/${id}` : '/invoices')} className="btn-secondary">Cancel</button>
+          <button type="button" onClick={() => navigate('/credit-notes')} className="btn-secondary">Cancel</button>
           <button type="submit" disabled={submitting} className="btn-primary">
-            {submitting ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Invoice' : 'Save as Draft')}
+            {submitting ? 'Creating...' : 'Create Credit Note'}
           </button>
-          {!isEdit && (
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={(e) => handleSubmit(e, 'sent')}
-              className="btn-success"
-            >
-              Save & Send
-            </button>
-          )}
         </div>
       </form>
     </div>

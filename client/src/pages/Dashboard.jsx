@@ -39,7 +39,11 @@ export default function Dashboard() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <Link to="/invoices/new" className="btn-primary">+ New Invoice</Link>
+        <div className="flex gap-2">
+          <Link to="/invoices/new" className="btn-primary">+ New Invoice</Link>
+          <Link to="/credit-notes/new" className="btn-secondary text-sm">+ Credit Note</Link>
+          <Link to="/reports" className="btn-secondary text-sm">Reports</Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

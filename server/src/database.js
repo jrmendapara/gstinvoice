@@ -95,6 +95,52 @@ function initializeSchema() {
       FOREIGN KEY (customer_id) REFERENCES customers(id)
     );
 
+    CREATE TABLE IF NOT EXISTS credit_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      credit_note_number TEXT NOT NULL UNIQUE,
+      credit_note_date TEXT NOT NULL,
+      invoice_id INTEGER,
+      business_id INTEGER NOT NULL,
+      customer_id INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      place_of_supply TEXT NOT NULL,
+      supply_state_code TEXT NOT NULL,
+      is_igst INTEGER DEFAULT 0,
+      subtotal REAL NOT NULL DEFAULT 0,
+      cgst_total REAL NOT NULL DEFAULT 0,
+      sgst_total REAL NOT NULL DEFAULT 0,
+      igst_total REAL NOT NULL DEFAULT 0,
+      total_tax REAL NOT NULL DEFAULT 0,
+      grand_total REAL NOT NULL DEFAULT 0,
+      amount_in_words TEXT,
+      notes TEXT,
+      status TEXT DEFAULT 'draft',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (business_id) REFERENCES businesses(id),
+      FOREIGN KEY (customer_id) REFERENCES customers(id),
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS credit_note_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      credit_note_id INTEGER NOT NULL,
+      product_id INTEGER,
+      description TEXT NOT NULL,
+      hsn_code TEXT NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'NOS',
+      quantity REAL NOT NULL,
+      rate REAL NOT NULL,
+      amount REAL NOT NULL,
+      gst_rate REAL NOT NULL,
+      cgst_amount REAL NOT NULL DEFAULT 0,
+      sgst_amount REAL NOT NULL DEFAULT 0,
+      igst_amount REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL,
+      FOREIGN KEY (credit_note_id) REFERENCES credit_notes(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    );
+
     CREATE TABLE IF NOT EXISTS invoice_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       invoice_id INTEGER NOT NULL,

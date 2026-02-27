@@ -15,6 +15,8 @@ app.use('/api/customers', require('./routes/customers'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/invoices', require('./routes/pdf'));
+app.use('/api/reports', require('./routes/reports'));
+app.use('/api/credit-notes', require('./routes/credit-notes'));
 
 // Serve static files in production
 const clientBuild = path.join(__dirname, '..', '..', 'client', 'dist');
