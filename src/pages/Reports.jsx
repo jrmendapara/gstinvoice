@@ -70,8 +70,14 @@ export default function Reports() {
   }
 
   function exportCSV(type) {
-    const url = `/api/reports/export/${type}?from=${from}&to=${to}`;
-    window.open(url, '_blank');
+    const csv = type === 'invoices' ? api.exportInvoicesCSV(from, to) : api.exportItemsCSV(from, to);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${type}_${from}_${to}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const tabs = [

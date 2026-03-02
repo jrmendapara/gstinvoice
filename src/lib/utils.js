@@ -1,44 +1,4 @@
-const INDIAN_STATES = {
-  '01': 'Jammu & Kashmir',
-  '02': 'Himachal Pradesh',
-  '03': 'Punjab',
-  '04': 'Chandigarh',
-  '05': 'Uttarakhand',
-  '06': 'Haryana',
-  '07': 'Delhi',
-  '08': 'Rajasthan',
-  '09': 'Uttar Pradesh',
-  '10': 'Bihar',
-  '11': 'Sikkim',
-  '12': 'Arunachal Pradesh',
-  '13': 'Nagaland',
-  '14': 'Manipur',
-  '15': 'Mizoram',
-  '16': 'Tripura',
-  '17': 'Meghalaya',
-  '18': 'Assam',
-  '19': 'West Bengal',
-  '20': 'Jharkhand',
-  '21': 'Odisha',
-  '22': 'Chhattisgarh',
-  '23': 'Madhya Pradesh',
-  '24': 'Gujarat',
-  '26': 'Dadra & Nagar Haveli and Daman & Diu',
-  '27': 'Maharashtra',
-  '28': 'Andhra Pradesh (Old)',
-  '29': 'Karnataka',
-  '30': 'Goa',
-  '31': 'Lakshadweep',
-  '32': 'Kerala',
-  '33': 'Tamil Nadu',
-  '34': 'Puducherry',
-  '35': 'Andaman & Nicobar Islands',
-  '36': 'Telangana',
-  '37': 'Andhra Pradesh',
-  '38': 'Ladakh',
-};
-
-function numberToWords(num) {
+export function numberToWords(num) {
   if (num === 0) return 'Zero';
 
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -52,7 +12,6 @@ function numberToWords(num) {
     return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convertLessThanThousand(n % 100) : '');
   }
 
-  // Indian numbering system: Lakh, Crore
   const rupees = Math.floor(num);
   const paise = Math.round((num - rupees) * 100);
 
@@ -81,26 +40,46 @@ function numberToWords(num) {
   return result + ' Only';
 }
 
-function generateInvoiceNumber(db) {
-  const currentYear = new Date().getFullYear();
-  const financialYear = new Date().getMonth() >= 3 ? currentYear : currentYear - 1;
-  const fy = `${financialYear}-${(financialYear + 1).toString().slice(2)}`;
-
-  const lastInvoice = db.prepare(
-    "SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1"
-  ).get(`INV/${fy}/%`);
-
-  let nextNum = 1;
-  if (lastInvoice) {
-    const parts = lastInvoice.invoice_number.split('/');
-    nextNum = parseInt(parts[2], 10) + 1;
-  }
-
-  return `INV/${fy}/${String(nextNum).padStart(4, '0')}`;
-}
-
-function round2(num) {
+export function round2(num) {
   return Math.round(num * 100) / 100;
 }
 
-module.exports = { INDIAN_STATES, numberToWords, generateInvoiceNumber, round2 };
+export function generateInvoiceNumber(invoices) {
+  const currentYear = new Date().getFullYear();
+  const financialYear = new Date().getMonth() >= 3 ? currentYear : currentYear - 1;
+  const fy = `${financialYear}-${(financialYear + 1).toString().slice(2)}`;
+  const prefix = `INV/${fy}/`;
+
+  let maxNum = 0;
+  for (const inv of invoices) {
+    if (inv.invoice_number && inv.invoice_number.startsWith(prefix)) {
+      const parts = inv.invoice_number.split('/');
+      const num = parseInt(parts[2], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+
+  return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
+}
+
+export function generateCreditNoteNumber(creditNotes) {
+  const currentYear = new Date().getFullYear();
+  const financialYear = new Date().getMonth() >= 3 ? currentYear : currentYear - 1;
+  const fy = `${financialYear}-${(financialYear + 1).toString().slice(2)}`;
+  const prefix = `CN/${fy}/`;
+
+  let maxNum = 0;
+  for (const cn of creditNotes) {
+    if (cn.credit_note_number && cn.credit_note_number.startsWith(prefix)) {
+      const parts = cn.credit_note_number.split('/');
+      const num = parseInt(parts[2], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+
+  return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
+}
+
+export function nowISO() {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}

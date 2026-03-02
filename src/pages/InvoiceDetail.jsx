@@ -40,7 +40,10 @@ export default function InvoiceDetail() {
   }
 
   function handlePrint() {
-    window.open(`/api/invoices/${id}/html`, '_blank');
+    const html = api.getInvoiceHTML(id);
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
   }
 
   if (loading) return <div className="text-center py-20 text-gray-500">Loading...</div>;
